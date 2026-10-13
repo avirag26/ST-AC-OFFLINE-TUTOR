@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ApiError, api } from "@/lib/api";
@@ -34,7 +35,12 @@ type AssignedSession = {
   startsAt: string;
   endsAt: string;
   notes: string | null;
-  batch: { id: string; name: string; className: string } | null;
+  batch: {
+    id: string;
+    name: string;
+    className: string;
+    studentCount?: number;
+  } | null;
 };
 
 function formatRange(startsAt: string, endsAt: string) {
@@ -51,6 +57,9 @@ export default function DashboardPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [batches, setBatches] = useState<AssignedBatch[]>([]);
   const [sessions, setSessions] = useState<AssignedSession[]>([]);
+  const [sessionTab, setSessionTab] = useState<"upcoming" | "completed">(
+    "upcoming",
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +118,8 @@ export default function DashboardPage() {
   }
 
   const upcoming = sessions.filter((s) => s.status === "SCHEDULED");
+  const completed = sessions.filter((s) => s.status === "COMPLETED");
+  const visibleSessions = sessionTab === "upcoming" ? upcoming : completed;
 
   return (
     <main className="min-h-dvh bg-surface-muted">
@@ -200,16 +211,55 @@ export default function DashboardPage() {
 
         <section className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-8">
           <h3 className="text-base font-semibold text-text">My sessions</h3>
+          <div
+            className="mt-4 grid grid-cols-2 gap-2"
+            role="tablist"
+            aria-label="Session status"
+          >
+            {(
+              [
+                {
+                  id: "upcoming" as const,
+                  label: `Upcoming (${upcoming.length})`,
+                },
+                {
+                  id: "completed" as const,
+                  label: `Completed (${completed.length})`,
+                },
+              ] as const
+            ).map((tab) => {
+              const selected = sessionTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setSessionTab(tab.id)}
+                  className={[
+                    "min-h-11 rounded-xl border px-3 text-sm font-semibold",
+                    selected
+                      ? "border-primary bg-primary text-white"
+                      : "border-border bg-surface text-text hover:bg-surface-muted",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           {loading ? (
             <p className="mt-3 text-sm text-text-secondary">Loading…</p>
-          ) : upcoming.length === 0 ? (
+          ) : visibleSessions.length === 0 ? (
             <p className="mt-3 text-sm text-text-secondary">
-              No upcoming sessions. The CEO will schedule center classes for
-              your batches.
+              {sessionTab === "upcoming"
+                ? "No upcoming sessions. The CEO will schedule center classes for your batches."
+                : "No completed sessions yet. Sessions move here after you save attendance."}
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {upcoming.map((session) => (
+              {visibleSessions.map((session) => (
                 <article
                   key={session.id}
                   className="rounded-xl border border-border bg-surface-muted px-4 py-3"
@@ -220,7 +270,14 @@ export default function DashboardPage() {
                         session.subjectName ||
                         "Offline session"}
                     </p>
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-success">
+                    <span
+                      className={[
+                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        session.status === "COMPLETED"
+                          ? "bg-surface-muted text-text-secondary"
+                          : "bg-emerald-50 text-success",
+                      ].join(" ")}
+                    >
                       {session.status}
                     </span>
                   </div>
@@ -230,8 +287,27 @@ export default function DashboardPage() {
                   {session.batch ? (
                     <p className="mt-1 text-sm text-text-secondary">
                       Batch: {session.batch.className} — {session.batch.name}
+                      {typeof session.batch.studentCount === "number"
+                        ? ` · ${session.batch.studentCount} students`
+                        : ""}
                     </p>
                   ) : null}
+                  {session.status === "SCHEDULED" &&
+                  session.batch &&
+                  session.batch.studentCount === 0 ? (
+                    <p className="mt-2 text-sm text-warning">
+                      No students enrolled in this batch. Ask the CEO to enroll
+                      students under Offline batches first.
+                    </p>
+                  ) : null}
+                  <Link
+                    href={`/sessions/${session.id}/attendance`}
+                    className="mt-3 inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm font-medium text-white hover:bg-primary-dark"
+                  >
+                    {session.status === "COMPLETED"
+                      ? "View / edit attendance"
+                      : "Mark attendance"}
+                  </Link>
                 </article>
               ))}
             </div>
