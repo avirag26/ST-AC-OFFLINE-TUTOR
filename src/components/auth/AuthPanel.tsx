@@ -14,7 +14,7 @@ const tabs: { id: AuthTab; label: string }[] = [
 const highlights = [
   "See batches and students assigned by the CEO",
   "Mark attendance for center classes",
-  "Create exams, upload marks, and run quizzes",
+  "Review upcoming and completed sessions",
 ];
 
 export function AuthPanel() {
